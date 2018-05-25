@@ -30,14 +30,14 @@ from setuptools import setup, find_packages
 
 all_requirements = [] #strong_requirements + dependencies_requirements
 
-setup(name='HOALS',
+setup(name='RecommenderSystem',
       version='0.0.1',
-      description='Higher Order Alternating Least Square',
-      url='https://github.com/RomainWarlop/HOALS',
+      description='Recommender System algorithms',
+      url='https://github.com/RomainWarlop/RecommenderSystem',
       author='Romain WARLOP',
       author_email='roaminwarlop@gmail.com',
       license='',
-      packages=['HOALS'],
+      packages=['RecommenderSystem'],
       install_requires=all_requirements,
       #test_suite='nose.collector',
       #tests_require=['nose'],

@@ -1,4 +1,4 @@
-# RecommenderSystem
+# Recommender System
 
 ## Description
 
