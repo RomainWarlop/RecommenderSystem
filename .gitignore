@@ -3,3 +3,7 @@ experiments/checkpoints/*
 experiments/checkpoints/
 experiments/derby.log
 experiments/metastore_db/
+experiments/HOALS/metastore_db/*
+experiments/.ipynb_checkpoints/*
+experiments/HOALS/.ipynb_checkpoints/*
+experiments/HOALS/derby.log
