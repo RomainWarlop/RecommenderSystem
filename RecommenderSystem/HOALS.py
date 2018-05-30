@@ -81,7 +81,7 @@ class HOALS(object):
             times = []
         
         for mode in self.dimensions_col:
-            print("Start "+mode+" Learning")
+            print("\t Start "+mode+" learning")
             
             ind = self.dimensions_col.index(mode)
             local_dataset = sqlContext.createDataFrame(datas[mode])
@@ -96,7 +96,7 @@ class HOALS(object):
             if timer:
                 t1 = time.time()
                 delta = t1-t0
-                print('time :',delta)
+                print('\t \t time :',delta,"seconds")
                 times.append(delta)
 
             latentFactors = res[mode].userFactors#.orderBy("id")
@@ -113,7 +113,7 @@ class HOALS(object):
             latentFactors = latentFactors.sort_index()
             self.features[mode] = np.array(latentFactors)
         if timer:
-            print('longest mode time :',np.max(times))
+            print('\t \t longest mode time :',np.max(times),"seconds")
 
         if self.model.lower()=="tucker":
             # get W
@@ -124,8 +124,25 @@ class HOALS(object):
             for mode in self.dimensions_col:
                 ind = self.dimensions_col.index(mode)
                 self.W = self.W.ttm(np.linalg.pinv(self.features[mode]),mode=ind)
-            
+    
     def predict(self,indexes):
+        if self.model.lower()=="tucker":
+            # adapt formula for tensor of dimension higher than 3
+            mode = self.dimensions_col[0]
+            out = self.W.ttv(self.features[mode][indexes[0],:],modes=0).T
+
+            for ind in range(1,len(self.dimensions_col)):
+                mode = self.dimensions_col[ind]
+                out = out.dot(self.features[mode][indexes[ind],:])
+        else:
+            out = 1
+            for r in np.arange(ranks[0]):
+                for mode in self.dimensions_col:
+                    ind = self.dimensions_col.index(mode)
+                    out *= self.features[ind][indexes[ind],r]
+        return out
+
+    def predict_old(self,indexes):
         # check if indexes is:
         # - list -> for one prediction
         # - list of list -> multiple prediction 
