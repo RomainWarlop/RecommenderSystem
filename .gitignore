@@ -1,0 +1,5 @@
+experiments/HOALS/checkpoints/*
+experiments/checkpoints/*
+experiments/checkpoints/
+experiments/derby.log
+experiments/metastore_db/
