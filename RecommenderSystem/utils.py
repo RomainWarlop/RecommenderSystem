@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
+from sktensor.sptensor import sptensor
 
-def crossval_split(data,userPerc,ratingsPerc,userCol,itemCol):
+def crossval_split(data,userPerc,ratingsPerc,userCol,itemCol,seed=None):
 	"""
 	Perform a train / test split of the data set. 
 	some users are totally in the training set
@@ -19,6 +20,9 @@ def crossval_split(data,userPerc,ratingsPerc,userCol,itemCol):
 	itemCol: string
 		name of the item column
 	"""
+	if seed is not None:
+		np.random.seed(int(seed))
+
 	nUser = len(set(data[userCol]))
 	
 	usersItems = data[[userCol,itemCol]].drop_duplicates()
@@ -43,3 +47,32 @@ def crossval_split(data,userPerc,ratingsPerc,userCol,itemCol):
 	trainingData = pd.concat([trainingData,testData_train])
 
 	return trainingData, testData
+
+def predict_hosvd(res,indexes):
+
+    # adapt formula for tensor of dimension higher than 3
+    out = res[1].ttv(res[0][0][indexes[0],:],modes=0).T
+
+    for ind in range(1,len(res[0])):
+        out = out.dot(res[0][ind][indexes[ind],:])
+
+    return out
+
+def dataframeToTensor(dataset,dimensions_col=['user','item','action'],rating_col='rating',keepZero=False):
+    dims = dict.fromkeys(dimensions_col)
+
+    shape = []
+    for col in dimensions_col:
+        dims[col] = max(dataset[col])+1
+        shape.append(dims[col])
+
+    if not(keepZero):
+        dataset = dataset.loc[dataset[rating_col]!=0]
+
+    subs = []
+    for col in dimensions_col:
+        subs.append(list(dataset[col]))
+
+    tensor = sptensor(tuple(subs), dataset[rating_col].values, shape=tuple(shape), dtype=np.float)
+
+    return tensor
