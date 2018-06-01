@@ -15,8 +15,8 @@ from copy import deepcopy
 class HOALS(object):
 
     def __init__(self,ranks,model='tucker',lbda=0.8,alpha=0.1,max_iter=5,
-                dimensions_col=['user','item','action'],rating_col=['rating'],
-                implicitPrefs=False):
+                dimensions_col=['user','item','action'],rating_col='rating',
+                implicitPrefs=False,seed=None):
         """
         Parameters
         ranks: list of integer
@@ -35,8 +35,9 @@ class HOALS(object):
         self.rating_col = rating_col
         self.implicitPrefs = implicitPrefs
         self.nDim = len(ranks)
+        self.seed = seed
 
-    def fit(self,dataset,timer=False):
+    def fit(self,dataset,keepZero=False,timer=False):
         # add check that each dimensions_col start at 0
         self.dims = dict.fromkeys(self.dimensions_col)
 
@@ -45,11 +46,14 @@ class HOALS(object):
             self.dims[col] = max(dataset[col])+1
             shape.append(self.dims[col])
 
+        if not(keepZero):
+            dataset = dataset.loc[dataset[self.rating_col]!=0]
+
         subs = []
         for col in self.dimensions_col:
             subs.append(list(dataset[col]))
 
-        self.tensor = sptensor(tuple(subs), dataset[self.rating_col], shape=tuple(shape), dtype=np.float)
+        self.tensor = sptensor(tuple(subs), dataset[self.rating_col].values, shape=tuple(shape), dtype=np.float)
 
         #==============================================================================
         # recuparation of the (user,item,rate) of the unfold matrix
@@ -91,7 +95,7 @@ class HOALS(object):
                 t0 = time.time()
             
             local_als = ALS(rank=self.ranks[ind],maxIter=self.max_iter,regParam=self.lbda,alpha=self.alpha,implicitPrefs=self.implicitPrefs,
-                            userCol='row',itemCol='col',ratingCol='rating')
+                            userCol='row',itemCol='col',ratingCol='rating',seed=self.seed)
             res[mode] = local_als.fit(local_dataset)
             if timer:
                 t1 = time.time()
