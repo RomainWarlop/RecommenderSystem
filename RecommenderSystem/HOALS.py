@@ -1,6 +1,7 @@
 from pyspark import SparkContext
 from pyspark.ml.recommendation import ALS
 from pyspark.sql import SQLContext
+from RecommenderSystem.param import *
 
 sc = SparkContext.getOrCreate()
 sqlContext = SQLContext(sc)
@@ -14,7 +15,7 @@ from copy import deepcopy
 
 class HOALS(object):
 
-    def __init__(self,ranks,model='tucker',lbda=0.8,alpha=0.1,max_iter=5,
+    def __init__(self,ranks=None,model='tucker',lbda=0.8,alpha=0.1,maxIter=5,
                 dimensions_col=['user','item','action'],rating_col='rating',
                 implicitPrefs=False,seed=None):
         """
@@ -24,36 +25,70 @@ class HOALS(object):
             either 'tucker' or 'cp' (case insensitive)
         """
 
-        self.ranks = ranks
-        if model.lower()!='tucker':
-            self.ranks = [ranks[0]]*len(ranks) # ensure that all dimensions are equal
-        self.model = model
-        self.lbda = lbda
-        self.alpha = alpha
-        self.max_iter = max_iter
+        # context
         self.dimensions_col = dimensions_col
         self.rating_col = rating_col
-        self.implicitPrefs = implicitPrefs
-        self.nDim = len(ranks)
         self.seed = seed
+        self.nDim = len(dimensions_col)
+        self.model = model
 
-    def fit(self,dataset,keepZero=False,timer=False):
+        # paramMap
+        self.paramMap = recoParamMap()
+
+        # all params 
+        lbda_ = HasLbda(self.paramMap)
+        lbda_.setLbda(lbda)
+
+        alpha_ = HasAlpha(self.paramMap)
+        alpha_.setAlpha(alpha)
+
+        maxIter_ = HasMaxIter(self.paramMap)
+        maxIter_.setMaxIter(maxIter)
+
+        self.implicitPrefs = implicitPrefs
+    
+        if model.lower()=='tucker':
+            ranks_ = dict.fromkeys(dimensions_col)
+            for dim in dimensions_col:
+                ind = dimensions_col.index(dim)
+                ranks_[dim] = HasRank(self.paramMap,dim)
+                val = ranks[ind] if ranks is not None else 1
+                ranks_[dim].setRank(val)
+        else:
+            rank_ = HasRank(self.paramMap,'rank',None)
+            val = ranks if type(ranks) is int else ranks[0] if ranks is not None else 1
+            rank_.setRank(val)
+        
+    def describe(self):
+        """ 
+        to do: align print based on length of words
+        """
+        print('model',self.model)
+        print('implicitPrefs',self.implicitPrefs)
+        
+        if self.model=='tucker':
+            print('ranks:')
+            for dim in self.dimensions_col:
+                print('\t',dim,'rank',self.paramMap.get(dim,'ranks'))
+        else:
+            print('rank',self.paramMap.get('rank',None))
+        print('lbda',self.paramMap.get('lbda'))
+        print('alpha',self.paramMap.get('alpha'))
+
+    def get(self,name,parent=None):
+        return self.paramMap.get(name,parent)
+
+    def set(self,name,value,parent=None,desc=None):
+        param_ = recoParam(parent,name,desc,value)
+        self.paramMap.addOrUpdate(name,param_)
+
+    def fit(self,tensor,timer=False):
         # add check that each dimensions_col start at 0
+        self.tensor = tensor 
+
         self.dims = dict.fromkeys(self.dimensions_col)
-
-        shape = []
         for col in self.dimensions_col:
-            self.dims[col] = max(dataset[col])+1
-            shape.append(self.dims[col])
-
-        if not(keepZero):
-            dataset = dataset.loc[dataset[self.rating_col]!=0]
-
-        subs = []
-        for col in self.dimensions_col:
-            subs.append(list(dataset[col]))
-
-        self.tensor = sptensor(tuple(subs), dataset[self.rating_col].values, shape=tuple(shape), dtype=np.float)
+            self.dims[col] = self.tensor.shape[self.dimensions_col.index(col)]
 
         #==============================================================================
         # recuparation of the (user,item,rate) of the unfold matrix
@@ -94,7 +129,15 @@ class HOALS(object):
             if timer:
                 t0 = time.time()
             
-            local_als = ALS(rank=self.ranks[ind],maxIter=self.max_iter,regParam=self.lbda,alpha=self.alpha,implicitPrefs=self.implicitPrefs,
+            if self.model=='tucker':
+                rank = self.get(mode,'ranks')
+            else:
+                rank = self.get('rank',None)
+            local_als = ALS(rank=rank,
+                            maxIter=self.get('maxIter'),
+                            regParam=self.get('lbda'),
+                            alpha=self.get('alpha'),
+                            implicitPrefs=self.implicitPrefs,
                             userCol='row',itemCol='col',ratingCol='rating',seed=self.seed)
             res[mode] = local_als.fit(local_dataset)
             if timer:
@@ -106,7 +149,8 @@ class HOALS(object):
             latentFactors = res[mode].userFactors#.orderBy("id")
             latentFactors_index = latentFactors.select('id').toPandas()
             latentFactors = latentFactors.select('features')
-            for k in range(self.ranks[ind]):
+
+            for k in range(rank):
                 latentFactors = latentFactors.withColumn('factor'+str(k),latentFactors.features[k])
             latentFactors = latentFactors.drop('features')
             latentFactors = latentFactors.toPandas()
@@ -120,9 +164,10 @@ class HOALS(object):
             print('\t \t longest mode time :',np.max(times),"seconds")
 
         if self.model.lower()=="tucker":
+            print("\t Get core tensor")
             # get W
             if self.implicitPrefs:
-                self.tensor.vals = np.repeat(1,len(dataset))
+                self.tensor.vals = np.repeat(1,len(self.tensor.vals))
             
             self.W = deepcopy(self.tensor)
             for mode in self.dimensions_col:
@@ -140,10 +185,11 @@ class HOALS(object):
                 out = out.dot(self.features[mode][indexes[ind],:])
         else:
             out = 1
-            for r in np.arange(ranks[0]):
+            rank = self.get('rank',None)
+            for r in np.arange(rank):
                 for mode in self.dimensions_col:
                     ind = self.dimensions_col.index(mode)
-                    out *= self.features[ind][indexes[ind],r]
+                    out *= self.features[mode][indexes[ind],r]
         return out
 
     def predict_old(self,indexes):
@@ -162,12 +208,12 @@ class HOALS(object):
                         tmp[index] *= self.features[mode][indexes[index][ind],elt[ind]]
                 out += tmp
         else:
-            out = np.ones(indexes_size)
-            for r in np.arange(ranks[0]):
-                for mode in self.dimensions_col:
-                    ind = self.dimensions_col.index(mode)
-                    for index in range(indexes_size):
-                        out[index] *= self.features[ind][indexes[index][ind],r]
+            rank = self.paramMap.get(self.dimensions_col[0],'ranks')
+            out = np.ones(rank)
+            for mode in self.dimensions_col:
+                ind = self.dimensions_col.index(mode)
+                out = np.multiply(out,self.features[mode][indexes[index][ind],:])
+            out = np.sum(out)
         
         return out
 
