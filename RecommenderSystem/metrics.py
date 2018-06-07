@@ -33,7 +33,7 @@ def rank_measure(rs,spark=True):
     0.475
     """
     den = sum(itertools.chain.from_iterable(rs))
-    sub_rank = lambda r: [r[i]*i/max(1,len(r)) for i in range(len(r))]
+    sub_rank = lambda r: [r[i]*i/len(r) for i in range(len(r))]
     if spark:
         num = sc.parallelize(rs).map(sub_rank).map(sum).sum()
         out = num/den
