@@ -63,17 +63,10 @@ class HOALS(object):
         """ 
         to do: align print based on length of words
         """
-        print('model',self.model)
-        print('implicitPrefs',self.implicitPrefs)
+        print('-'*15+'> model','=',self.model)
+        print('-'*7+'> implicitPrefs','=',self.implicitPrefs)
         
-        if self.model=='tucker':
-            print('ranks:')
-            for dim in self.dimensions_col:
-                print('\t',dim,'rank',self.paramMap.get(dim,'ranks'))
-        else:
-            print('rank',self.paramMap.get('rank',None))
-        print('lbda',self.paramMap.get('lbda'))
-        print('alpha',self.paramMap.get('alpha'))
+        self.paramMap.describe()
 
     def get(self,name,parent=None):
         return self.paramMap.get(name,parent)

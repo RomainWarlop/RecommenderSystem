@@ -192,7 +192,6 @@ class RecoCrossValidator(object):
 		cvParameters_ = []
 		for elt in self.paramGrid.params:
 			cvParameters_.append(list(range(elt['size'])))
-		cvParameters = itProduct(*cvParameters_)
 		
 		columns = []
 		for elt in self.paramGrid.params:
@@ -221,6 +220,7 @@ class RecoCrossValidator(object):
 				rating_col=self.estimator.rating_col,keepZero=False)
 			
 			# to do in parallel ? -> https://www.timlrx.com/2018/04/08/creating-a-custom-cross-validation-function-in-pyspark/
+			cvParameters = itProduct(*cvParameters_) # restart iterator
 			for elt in cvParameters:
 				names = []
 				values = []

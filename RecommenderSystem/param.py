@@ -26,6 +26,19 @@ class recoParamMap(object):
 			out = out[name]['value']
 		return out
 
+	def describe(self):
+		min_len = 20
+
+		for key in self.__dict__.keys():
+			elt = self.__dict__[key]
+			if type(elt)==dict:
+				for sub_key in elt.keys():
+					print('-'*(min_len-len(key)-len(sub_key)-3)+'> '+key,'-',sub_key,'=',elt[sub_key]['value'])
+			else:
+				name = elt.name
+				value = elt.value
+				print('-'*(min_len-len(name))+'> '+name,'=',value)
+
 class recoParam(object):
 
 	def __init__(self,parent,name,desc,value=None):
@@ -65,7 +78,7 @@ class HasAlpha(recoParam):
 class HasRank(recoParam):
 
 	def __init__(self,paramMap,name,parent='ranks'):
-		super(HasRank,self).__init__(parent,name,'rank value of %name dimension',1)
+		super(HasRank,self).__init__(parent,name,'rank value in '+name+' dimension',1)
 		self.paramMap = paramMap
 		if parent is None:
 			paramMap.addOrUpdate(name,self)
